@@ -1,0 +1,21 @@
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: cicd-orchestration:0.1.0
+    container_name: cicd-orchestration-app
+    ports:
+      - "5000:5000"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=3)"
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
