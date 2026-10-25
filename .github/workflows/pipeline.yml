@@ -66,6 +66,48 @@ jobs:
             ghcr.io/${{ github.repository_owner }}/cicd-orchestration:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/cicd-orchestration:latest
 
+  staging:
+    name: Stage 6 - Staging Deployment and Smoke Tests
+    runs-on: ubuntu-latest
+    needs: docker_build
+    if: github.event_name != 'pull_request'
+
+    steps:
+      - name: Pull published Docker image
+        run: |
+          docker pull ghcr.io/${{ github.repository_owner }}/cicd-orchestration:${{ github.sha }}
+
+      - name: Deploy staging container
+        run: |
+          docker run -d \
+            --name cicd-staging \
+            -p 5001:5000 \
+            ghcr.io/${{ github.repository_owner }}/cicd-orchestration:${{ github.sha }}
+
+      - name: Wait for application readiness
+        shell: bash
+        run: |
+          for i in {1..15}; do
+            if curl --fail --silent http://localhost:5001/health; then
+              echo "Staging health check passed"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Staging health check failed"
+          docker logs cicd-staging
+          exit 1
+
+      - name: Run staging smoke tests
+        run: |
+          curl --fail --silent http://localhost:5001/ > /dev/null
+          curl --fail --silent http://localhost:5001/pipeline
+          echo "Staging smoke tests passed"
+
+      - name: Clean up staging container
+        if: always()
+        run: docker rm -f cicd-staging || true
+
 
 
   test:
