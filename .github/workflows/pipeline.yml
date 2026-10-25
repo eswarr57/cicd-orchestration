@@ -108,6 +108,53 @@ jobs:
         if: always()
         run: docker rm -f cicd-staging || true
 
+  production:
+    name: Stage 7 - Production Release
+    runs-on: ubuntu-latest
+    needs: staging
+    if: github.event_name != 'pull_request'
+    environment:
+      name: production
+    concurrency:
+      group: production-release
+      cancel-in-progress: false
+
+    steps:
+      - name: Pull the image verified by staging
+        run: |
+          docker pull ghcr.io/${{ github.repository_owner }}/cicd-orchestration:${{ github.sha }}
+
+      - name: Deploy production container
+        run: |
+          docker run -d \
+            --name cicd-production \
+            -p 5002:5000 \
+            ghcr.io/${{ github.repository_owner }}/cicd-orchestration:${{ github.sha }}
+
+      - name: Verify production health
+        shell: bash
+        run: |
+          for i in {1..15}; do
+            if curl --fail --silent http://localhost:5002/health; then
+              echo "Production health check passed"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Production health check failed"
+          docker logs cicd-production
+          exit 1
+
+      - name: Run production smoke tests
+        run: |
+          curl --fail --silent http://localhost:5002/ > /dev/null
+          curl --fail --silent http://localhost:5002/pipeline
+          echo "Production smoke tests passed"
+
+      - name: Clean up production container
+        if: always()
+        run: docker rm -f cicd-production || true
+
 
 
   test:
