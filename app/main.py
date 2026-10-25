@@ -31,7 +31,6 @@ def pipeline():
         ],
         "status": "ready"
     }), 200
-"automation_demo": "Triggered by GitHub Actions"
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=False)
